@@ -53,8 +53,19 @@
 
 ---
 
-## 四、MVP 切片说明
+## 四、故事地图图版（PNG）
+
+上两节的表格有一份可直接放进评审幻灯片的图版，绿色卡片即 Sprint 1 承诺的 Walking Skeleton 路径，虚线小字为故事内的验收细化点。
+
+![CampusOverflow 用户故事地图](user-story-map.png)
+
+> 图版源：本文档第二、三节内容，经 SM 整理输出；如需更新故事，请先改本文档，再重新生成 `user-story-map.png`，确保图文一致。
+
+---
+
+## 五、MVP 切片说明
 
 - 每个活动只保留**最薄的一张卡片**，保证链路可走通，而非功能完备。
 - 非核心交互（如富文本高级编辑、复杂筛选）延后，避免范围蔓延。
 - 故事详情与优先级见 [product-backlog.md](product-backlog.md)，验收标准见 [stories/](stories/)。
+- Sprint 1 的会议决策与任务分工见 [sprint-1-planning-纪要.md](sprint-1-planning-纪要.md)，任务分解见 [sprint-1-backlog.md](sprint-1-backlog.md)。
