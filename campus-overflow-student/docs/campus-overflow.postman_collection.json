@@ -1,0 +1,269 @@
+{
+  "info": {
+    "name": "CampusOverflow API",
+    "description": "CampusOverflow 校园问答系统接口集合。认证采用服务端会话（HttpOnly Cookie），写操作需携带 X-XSRF-TOKEN 头。先执行「获取 CSRF」与「登录」，Postman 会自动保存会话 Cookie。",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "campus-overflow-collection-v1"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "questionId", "value": "1" },
+    { "key": "answerId", "value": "1" },
+    { "key": "xsrfToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "认证 Auth",
+      "item": [
+        {
+          "name": "获取 CSRF Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json && json.token) { pm.collectionVariables.set('xsrfToken', json.token); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/csrf", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "csrf"] }
+          }
+        },
+        {
+          "name": "登录",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-XSRF-TOKEN", "value": "{{xsrfToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"demo\",\n  \"password\": \"demo12345\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "login"] }
+          }
+        },
+        {
+          "name": "当前登录用户",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/me", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "me"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "问题 Question",
+      "item": [
+        {
+          "name": "发布问题（成功用例）",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('返回 201 Created', function () { pm.response.to.have.status(201); });",
+                  "var json = pm.response.json();",
+                  "pm.test('返回问题 id', function () { pm.expect(json.id).to.be.a('number'); });",
+                  "if (json && json.id) { pm.collectionVariables.set('questionId', json.id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-XSRF-TOKEN", "value": "{{xsrfToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"courseId\": 100,\n  \"title\": \"红黑树插入后为什么必须旋转？\",\n  \"body\": \"仅靠变色为什么无法恢复平衡？希望有一个直观的解释，最好能给出一个反例。\",\n  \"tags\": [\"数据结构\", \"红黑树\"]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/questions", "host": ["{{baseUrl}}"], "path": ["api", "v1", "questions"] }
+          }
+        },
+        {
+          "name": "问题列表",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/questions?page=1&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "questions"],
+              "query": [
+                { "key": "courseId", "value": "100", "disabled": true },
+                { "key": "page", "value": "1" },
+                { "key": "size", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "问题详情",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/v1/questions/{{questionId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "questions", "{{questionId}}"] }
+          }
+        },
+        {
+          "name": "编辑问题",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "X-XSRF-TOKEN", "value": "{{xsrfToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"courseId\": 100,\n  \"title\": \"红黑树插入后为什么必须旋转（已更新）？\",\n  \"body\": \"更新后的问题正文：仅靠变色无法恢复平衡，需要旋转来调整黑高。\",\n  \"tags\": [\"数据结构\", \"红黑树\", \"平衡树\"]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/questions/{{questionId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "questions", "{{questionId}}"] }
+          }
+        },
+        {
+          "name": "删除问题（软删除）",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "X-XSRF-TOKEN", "value": "{{xsrfToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/v1/questions/{{questionId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "questions", "{{questionId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "回答 Answer",
+      "item": [
+        {
+          "name": "提交回答",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('返回 201 Created', function () { pm.response.to.have.status(201); });",
+                  "var json = pm.response.json();",
+                  "if (json && json.id) { pm.collectionVariables.set('answerId', json.id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-XSRF-TOKEN", "value": "{{xsrfToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"body\": \"关键在于黑高这个不变量：仅靠变色无法调整黑高，而旋转可以在不破坏 BST 性质的前提下重新分布节点。\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/questions/{{questionId}}/answers", "host": ["{{baseUrl}}"], "path": ["api", "v1", "questions", "{{questionId}}", "answers"] }
+          }
+        },
+        {
+          "name": "编辑回答",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "X-XSRF-TOKEN", "value": "{{xsrfToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"body\": \"更新后的回答：黑高不变量是核心，旋转用于在保持 BST 性质的同时调整黑高。\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/answers/{{answerId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "answers", "{{answerId}}"] }
+          }
+        },
+        {
+          "name": "采纳最佳答案",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "X-XSRF-TOKEN", "value": "{{xsrfToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"answerId\": {{answerId}}\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/questions/{{questionId}}/accepted-answer", "host": ["{{baseUrl}}"], "path": ["api", "v1", "questions", "{{questionId}}", "accepted-answer"] }
+          }
+        },
+        {
+          "name": "教师认证回答",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-XSRF-TOKEN", "value": "{{xsrfToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/v1/answers/{{answerId}}/endorsement", "host": ["{{baseUrl}}"], "path": ["api", "v1", "answers", "{{answerId}}", "endorsement"] }
+          }
+        },
+        {
+          "name": "删除回答（软删除）",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "X-XSRF-TOKEN", "value": "{{xsrfToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/v1/answers/{{answerId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "answers", "{{answerId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "投票与评论",
+      "item": [
+        {
+          "name": "投票（赞成/反对/撤销）",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "X-XSRF-TOKEN", "value": "{{xsrfToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetType\": \"ANSWER\",\n  \"targetId\": {{answerId}},\n  \"value\": 1\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/votes", "host": ["{{baseUrl}}"], "path": ["api", "v1", "votes"] }
+          }
+        },
+        {
+          "name": "发表评论",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-XSRF-TOKEN", "value": "{{xsrfToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetType\": \"QUESTION\",\n  \"targetId\": {{questionId}},\n  \"parentId\": null,\n  \"body\": \"这个问题问得很好，同问！\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/comments", "host": ["{{baseUrl}}"], "path": ["api", "v1", "comments"] }
+          }
+        },
+        {
+          "name": "热门标签",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/v1/tags/popular?limit=10", "host": ["{{baseUrl}}"], "path": ["api", "v1", "tags", "popular"], "query": [{ "key": "limit", "value": "10" }] }
+          }
+        }
+      ]
+    }
+  ]
+}
