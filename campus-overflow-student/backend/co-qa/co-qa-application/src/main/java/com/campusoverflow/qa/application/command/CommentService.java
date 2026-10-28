@@ -13,6 +13,7 @@ import com.campusoverflow.shared.event.EventIds;
 import com.campusoverflow.shared.event.IntegrationEventPublisher;
 import com.campusoverflow.shared.security.Actor;
 import java.time.Clock;
+import java.time.Instant;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,7 +38,26 @@ public class CommentService {
 
     @Transactional
     public long post(Actor actor, PostCommentCommand cmd) {
-        // TODO(S2)：实现 CommentService.post——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S2)：CommentService.post 尚未实现");
+        Instant now = Instant.now(clock);
+        Comment parent = cmd.parentId() == null ? null
+                : comments.findById(cmd.parentId())
+                        .orElseThrow(() -> new NotFoundException("QA-1007", "父评论不存在: " + cmd.parentId()));
+        long questionId;
+        if (cmd.targetType() == TargetType.QUESTION) {
+            Question q = questions.findById(cmd.targetId())
+                    .orElseThrow(() -> new NotFoundException("QA-1000", "问题不存在: " + cmd.targetId()));
+            q.ensureOpenForAnswers();
+            questionId = q.id();
+        } else {
+            Answer a = answers.findById(cmd.targetId())
+                    .orElseThrow(() -> new NotFoundException("QA-2000", "回答不存在: " + cmd.targetId()));
+            questionId = a.questionId();
+        }
+        Comment comment = Comment.post(cmd.targetType(), cmd.targetId(), questionId, actor.userId(), parent,
+                cmd.body(), now);
+        Comment saved = comments.save(comment);
+        events.publish(new CommentPostedEvent(EventIds.next(), now, saved.id(), questionId,
+                actor.userId(), cmd.body()));
+        return saved.id();
     }
 }
