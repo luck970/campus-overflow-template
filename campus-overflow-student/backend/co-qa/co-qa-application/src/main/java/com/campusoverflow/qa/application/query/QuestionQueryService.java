@@ -1,8 +1,6 @@
 package com.campusoverflow.qa.application.query;
 
-import com.campusoverflow.identity.api.CourseSummary;
 import com.campusoverflow.identity.api.IdentityApi;
-import com.campusoverflow.identity.api.UserSummary;
 import com.campusoverflow.qa.application.port.ContentRenderer;
 import com.campusoverflow.qa.application.port.QaReadModel;
 import com.campusoverflow.qa.application.port.QuestionListCache;
@@ -13,12 +11,9 @@ import com.campusoverflow.shared.page.PageResult;
 import com.campusoverflow.shared.security.Actor;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class QuestionQueryService {
 
     private static final int EXCERPT_LENGTH = 160;
+    private static final int MAX_TAGS = 50;
 
     private final QaReadModel readModel;
     private final IdentityApi identity;
@@ -46,80 +42,106 @@ public class QuestionQueryService {
     }
 
     public PageResult<QuestionSummaryView> list(Long courseId, PageRequest page) {
+        if (courseId != null && identity.findCourse(courseId).isEmpty()) {
+            throw new NotFoundException("COURSE_NOT_FOUND", "课程不存在");
+        }
         Optional<PageResult<QuestionSummaryView>> cached = cache.get(courseId, page);
         if (cached.isPresent()) {
             return cached.get();
         }
         PageResult<QuestionRow> rows = readModel.listQuestions(courseId, page);
-        Set<Long> authorIds = rows.items().stream().map(QuestionRow::authorId)
-                .collect(Collectors.toCollection(HashSet::new));
-        Map<Long, UserSummary> users = identity.findUsers(authorIds);
-        PageResult<QuestionSummaryView> result = rows.map(r -> {
-            AuthorView author = AuthorView.of(r.authorId(), users.get(r.authorId()));
-            String excerpt = renderer.toPlainText(r.body(), EXCERPT_LENGTH);
-            return new QuestionSummaryView(r.id(), r.title(), excerpt, r.tags(), r.courseId(), author,
-                    r.score(), r.answerCount(), r.viewCount(), r.acceptedAnswerId() != null, r.createdAt());
-        });
+        Map<Long, com.campusoverflow.identity.api.UserSummary> users =
+                identity.findUsers(rows.items().stream().map(QuestionRow::authorId).collect(Collectors.toSet()));
+        List<QuestionSummaryView> summaries = rows.items().stream()
+                .map(r -> new QuestionSummaryView(
+                        r.id(),
+                        r.title(),
+                        renderer.toPlainText(r.body(), EXCERPT_LENGTH),
+                        r.tags(),
+                        r.courseId(),
+                        AuthorView.of(r.authorId(), users.get(r.authorId())),
+                        r.score(),
+                        r.answerCount(),
+                        r.viewCount(),
+                        r.acceptedAnswerId() != null,
+                        r.createdAt()))
+                .toList();
+        PageResult<QuestionSummaryView> result = new PageResult<>(summaries, rows.total(), page.page(), page.size());
         cache.put(courseId, page, result);
         return result;
     }
 
     public QuestionDetailView detail(long questionId, Actor actorOrNull) {
-        QuestionRow q = readModel.findQuestion(questionId)
-                .orElseThrow(() -> new NotFoundException("QA-1000", "问题不存在: " + questionId));
-        List<AnswerRow> answerRows = readModel.findAnswers(questionId);
-        List<CommentRow> commentRows = readModel.findComments(questionId);
-
-        Set<Long> authorIds = new HashSet<>();
-        authorIds.add(q.authorId());
-        answerRows.forEach(a -> authorIds.add(a.authorId()));
-        commentRows.forEach(c -> authorIds.add(c.authorId()));
-        Map<Long, UserSummary> users = identity.findUsers(authorIds);
-
-        List<Long> answerIds = answerRows.stream().map(AnswerRow::id).toList();
-        Map<String, Integer> myVotes = actorOrNull == null ? Map.of()
-                : readModel.findMyVotes(actorOrNull.userId(), questionId, answerIds);
-
+        QuestionRow row = readModel.findQuestion(questionId)
+                .orElseThrow(() -> new NotFoundException("QUESTION_NOT_FOUND", "问题不存在或已删除"));
         viewCounter.increment(questionId);
 
-        CourseRefView courseRef = null;
-        if (q.courseId() != null) {
-            CourseSummary course = identity.findCourse(q.courseId()).orElse(null);
-            if (course != null) {
-                courseRef = new CourseRefView(course.id(), course.code(), course.name());
+        List<AnswerRow> answerRows = new ArrayList<>(readModel.findAnswers(questionId));
+        answerRows.sort(Comparator.comparingLong(AnswerRow::id));
+        List<CommentRow> commentRows = readModel.findComments(questionId);
+
+        List<Long> authorIds = new ArrayList<>();
+        authorIds.add(row.authorId());
+        answerRows.forEach(a -> authorIds.add(a.authorId()));
+        commentRows.forEach(c -> authorIds.add(c.authorId()));
+        answerRows.stream().map(AnswerRow::endorsedBy).filter(java.util.Objects::nonNull).forEach(authorIds::add);
+        Map<Long, com.campusoverflow.identity.api.UserSummary> users =
+                identity.findUsers(authorIds.stream().collect(Collectors.toSet()));
+
+        AuthorView author = AuthorView.of(row.authorId(), users.get(row.authorId()));
+
+        CourseRefView course = null;
+        if (row.courseId() != null) {
+            Optional<com.campusoverflow.identity.api.CourseSummary> cs = identity.findCourse(row.courseId());
+            if (cs.isPresent()) {
+                course = new CourseRefView(cs.get().id(), cs.get().code(), cs.get().name());
             }
         }
 
-        List<AnswerView> answerViews = answerRows.stream().map(a -> {
-            AuthorView author = AuthorView.of(a.authorId(), users.get(a.authorId()));
-            AuthorView endorser = null;
-            if (a.endorsedBy() != null) {
-                endorser = AuthorView.of(a.endorsedBy(), identity.findUser(a.endorsedBy()).orElse(null));
-            }
-            int myVote = myVotes.getOrDefault("ANSWER:" + a.id(), 0);
-            boolean canEdit = actorOrNull != null && actorOrNull.is(a.authorId());
-            return new AnswerView(a.id(), a.body(), renderer.toSafeHtml(a.body()), author, a.score(),
-                    q.acceptedAnswerId() != null && q.acceptedAnswerId() == a.id(), endorser, myVote,
-                    canEdit, a.createdAt(), a.updatedAt(), List.of());
-        }).toList();
+        Map<String, Integer> myVotes = actorOrNull == null
+                ? Map.of()
+                : readModel.findMyVotes(actorOrNull.userId(), questionId,
+                        answerRows.stream().map(AnswerRow::id).collect(Collectors.toSet()));
+        int questionVote = myVotes.getOrDefault("QUESTION:" + questionId, 0);
 
-        List<CommentView> commentViews = commentRows.stream().map(c -> {
-            AuthorView author = AuthorView.of(c.authorId(), users.get(c.authorId()));
-            return new CommentView(c.id(), author, c.parentId(), c.body(), c.createdAt());
-        }).toList();
+        boolean manage = actorOrNull != null && row.courseId() != null
+                && identity.canManageCourse(actorOrNull.userId(), row.courseId());
+        boolean own = actorOrNull != null && actorOrNull.is(row.authorId());
+        PermissionsView permissions = actorOrNull == null
+                ? PermissionsView.NONE
+                : new PermissionsView(own, own || manage, own || manage, manage);
 
-        int myQuestionVote = myVotes.getOrDefault("QUESTION:" + questionId, 0);
-        boolean canManage = actorOrNull != null && identity.canManageCourse(actorOrNull.userId(), q.courseId());
-        boolean canEdit = actorOrNull != null && actorOrNull.is(q.authorId());
-        PermissionsView permissions = new PermissionsView(canEdit, canEdit, canManage || canEdit, canManage);
+        List<CommentView> questionComments = commentRows.stream()
+                .filter(c -> "QUESTION".equals(c.targetType()))
+                .map(c -> new CommentView(c.id(), AuthorView.of(c.authorId(), users.get(c.authorId())),
+                        c.parentId(), c.body(), c.createdAt()))
+                .toList();
 
-        return new QuestionDetailView(q.id(), q.title(), q.body(), renderer.toSafeHtml(q.body()), q.tags(),
-                courseRef, AuthorView.of(q.authorId(), users.get(q.authorId())), q.score(), q.answerCount(),
-                q.viewCount(), q.acceptedAnswerId(), myQuestionVote, q.createdAt(), q.updatedAt(),
-                permissions, commentViews, answerViews);
+        List<AnswerView> answers = answerRows.stream()
+                .map(a -> {
+                    List<CommentView> answerComments = commentRows.stream()
+                            .filter(c -> "ANSWER".equals(c.targetType()) && c.targetId() == a.id())
+                            .map(c -> new CommentView(c.id(),
+                                    AuthorView.of(c.authorId(), users.get(c.authorId())),
+                                    c.parentId(), c.body(), c.createdAt()))
+                            .toList();
+                    AuthorView endorsedBy = a.endorsedBy() == null ? null
+                            : AuthorView.of(a.endorsedBy(), users.get(a.endorsedBy()));
+                    return new AnswerView(a.id(), a.body(), renderer.toSafeHtml(a.body()),
+                            AuthorView.of(a.authorId(), users.get(a.authorId())), a.score(),
+                            row.acceptedAnswerId() != null, endorsedBy,
+                            myVotes.getOrDefault("ANSWER:" + a.id(), 0),
+                            actorOrNull != null && actorOrNull.is(a.authorId()),
+                            a.createdAt(), a.updatedAt(), answerComments);
+                })
+                .toList();
+
+        return new QuestionDetailView(row.id(), row.title(), row.body(), renderer.toSafeHtml(row.body()), row.tags(),
+                course, author, row.score(), row.answerCount(), row.viewCount() + 1, row.acceptedAnswerId(),
+                questionVote, row.createdAt(), row.updatedAt(), permissions, questionComments, answers);
     }
 
     public List<TagView> popularTags(int limit) {
-        return readModel.popularTags(limit);
+        return readModel.popularTags(Math.min(Math.max(limit, 1), MAX_TAGS));
     }
 }
