@@ -53,10 +53,17 @@
 
 ## 四、后续 Backlog（候选，暂不估算）
 
-- 关键词搜索与相关问题推荐
-- @提及与通知
-- 投票（赞成/反对）、评论
-- 徽章、悬赏、排行榜
-- 教师管理视角（课程管理、加精）
+| 候选项 | 规划去向 | 实现状态（2026-11-04 核对） | 备注 |
+| --- | --- | --- | --- |
+| 关键词搜索与相关问题推荐 | Sprint 3 | 未实现（`TODO(S3)`，co-discovery） | 中文检索采用 MySQL ngram（ADR-005） |
+| @提及与通知 | Sprint 3 | 未实现（`TODO(S3)`，co-discovery） | 依赖事务性发件箱（ADR-002） |
+| 投票（赞成/反对） | Sprint 3 补验收 | **代码已实现**（`Vote` 聚合 / `VoteService`） | 随 co-qa 落地，**尚无故事与 Gherkin**，验收待补 |
+| 评论 | Sprint 3 补验收 | **代码已实现**（`Comment` 聚合 / `CommentService`） | 同上 |
+| 标签（含热门标签） | Sprint 3 补验收 | **代码已实现**（`Tags` 聚合 / `TagController`） | 同上 |
+| 教师认证回答 | Sprint 3 补验收 | **代码已实现**（`Answer.endorse`） | 同上，涉及教师角色权限 |
+| 徽章、悬赏、排行榜 | Sprint 3 | 未实现（`TODO(S3)`，co-reputation） | 悬赏为状态机 OPEN→AWARDED/EXPIRED |
+| 教师管理视角（课程管理、加精） | Sprint 3+ | 未实现 | 现有 `AdminUserController` 仅覆盖用户管理 |
 
-> 这些故事在后续 Sprint 细化后补全 ID、优先级与故事点。
+> **决策 D4 留痕**：投票、评论、标签、教师认证四项已随 `co-qa` 在后端落地，但 Product Backlog 与 Gherkin 中无对应故事，属「有代码、无需求、无验收」。本轮**不新造 US 编号**（避免打乱既有追溯关系），Sprint 3 统一补 ID、Gherkin 与验收记录。详见 `docs/backlog/sprint-2-planning-纪要.md` §3.5。
+
+> 上述候选在细化后补全 ID、优先级与故事点；补全前一律不进入 Sprint 承诺。
