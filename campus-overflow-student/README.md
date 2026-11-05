@@ -147,8 +147,8 @@ mvn verify -Dit.test=CampusOverflowFlowIT             # 期望：Sprint 3 完成
 ### 9.4 数字口径
 
 模块数为 **27**；集成测试 **1 个**（`CampusOverflowFlowIT`，当前禁用中）。
-单元测试与架构测试的用例数**以 `mvn test` 实际输出为准，不在文档中硬编码**，避免文档与代码演进脱节。
-评审需要具体数字时，以当次构建日志截图为准并附入 `docs/lab4/`。
+
+单元测试基线：**14 个测试类 / 55 个用例，Failures 0、Errors 0、Skipped 0**（2026-11-05 实测，`mvn clean test` 于 `backend/` 下执行）。该基线**只增不减**；后续 Sprint 新增用例时须同步更新本行数字，删减用例须在 PR 说明中给出理由。评审核对时以当次 `mvn test` 输出为准，并把日志或截图附入 `docs/lab4/`。
 
 ### 9.5 不要做的事
 
