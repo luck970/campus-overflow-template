@@ -96,3 +96,62 @@ cd ../frontend && npm install && npm run dev      # http://localhost:5173
 | 中文搜索没结果 | 必须用 compose 里的 MySQL（已配置 `ngram_token_size=2`），自建库请对照参数 |
 | 事件重复导致加分两次 | 消费端必须幂等：账本唯一键 `(event_id, user_id, reason)` 或 `processed_event` 表 |
 | 提交后 CI 红 | 先本地跑 `mvn verify`，再推送；不要把红的分支合并到 `main` |
+
+---
+
+## 9. 团队构建口径（Sprint 2 / Lab 4）
+
+> 本节由团队补充，用于统一 Lab 4 的构建与验收口径。第 1–8 节为课程模板原文，**保持不改**。
+> 维护人：SM 左燚之（@Flagg32）｜ 对应任务：T-038 ｜ 相关决策：D1、行动项 A-08
+
+### 9.1 标准命令与期望结果
+
+```bash
+cd backend
+
+# ① 标准构建（Lab 4 提交物① 的口径）
+mvn clean install -DskipITs          # 期望：BUILD SUCCESS，27 个模块
+
+# ② 单元测试基线
+mvn test                             # 期望：Failures: 0, Errors: 0, Skipped: 0
+
+# ③ 架构约束（FF-1 ~ FF-6，共 6 条 ArchUnit 规则）
+mvn test -pl co-bootstrap -Dtest=ArchitectureTest    # 期望：6 条规则全部通过
+
+# ④ 集成测试（当前禁用，Sprint 3 完成后恢复）
+mvn verify -Dit.test=CampusOverflowFlowIT             # 期望：Sprint 3 完成后转绿，需本机 Docker
+```
+
+### 9.2 为什么标准构建带 `-DskipITs`
+
+端到端集成测试 `CampusOverflowFlowIT` 覆盖「提问 → 回答 → 采纳 → 声誉结算 → 搜索命中 → 通知送达」整条链路。
+其中**声誉结算、搜索投影、通知投递**三项按课程任务清单属于 **S3（Sprint 3）** 范围，在 Sprint 2 内不可能通过。
+若保持启用，`mvn clean install` 会因该测试失败而整体失败，**单元测试基线的真实状态将被掩盖**——
+评审时无法判断题红是因为业务没做完，还是因为代码有回归。
+
+因此按决策 **D1**，该类已加 `@Disabled` 并在类注释中写明理由与恢复条件（见
+`backend/co-bootstrap/src/test/java/com/campusoverflow/CampusOverflowFlowIT.java` 类头注释），
+构建口径相应改为「单元测试全绿 + 集成测试有理由禁用并列入 S3 恢复计划」。
+该口径已向教师书面说明（行动项 A-08，话术见 `docs/lab4/提交物与验收口径.md`「向教师的确认话术」）。
+
+### 9.3 集成测试恢复条件
+
+以下三条须**同时**满足，方可删除 `@Disabled`：
+
+1. Sprint 3 完成搜索投影、通知投递、声誉结算三项能力；
+2. 在本机 Docker 下跑通 `mvn verify -Dit.test=CampusOverflowFlowIT`（Testcontainers 会拉起 `mysql:8.0.39` 与 `redis:7-alpine`）；
+3. 构建口径改回含集成测试的完整构建，并同步更新本节 9.1 与 9.2。
+
+恢复工作的第一责任人为 Sprint 3 的 SM，随 Sprint 3 首个 PR 一并提交。
+
+### 9.4 数字口径
+
+模块数为 **27**；集成测试 **1 个**（`CampusOverflowFlowIT`，当前禁用中）。
+单元测试与架构测试的用例数**以 `mvn test` 实际输出为准，不在文档中硬编码**，避免文档与代码演进脱节。
+评审需要具体数字时，以当次构建日志截图为准并附入 `docs/lab4/`。
+
+### 9.5 不要做的事
+
+- 不要为了让构建变绿而删除 `@Disabled` 让集成测试跑起来，也不要用 `-Dmaven.test.failure.ignore=true` 掩盖失败；
+- 不要修改第 1–8 节的模板原文（构建口径统一写在本节）；
+- 不要删除或放宽 `ArchitectureTest` 的规则——那是评分项「工程结构 30%」的自动化证据。
