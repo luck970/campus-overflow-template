@@ -45,8 +45,8 @@
 | --- | --- | --- | --- | --- | --- |
 | T-035 | Postman Collection 成功用例实跑并留存证据 | 提交物④ | 何欣怡 | To Do | 集合已存在 16 个请求；补「运行结果截图 + 导出的 run report」入 `docs/lab4/` |
 | T-036 | ADR-009 包结构与四层分层决策 | 提交物③（对应 PDF 的 ADR-002-package-structure） | 江思达 | To Do | 含背景 / 决策 / 后果 / 被否决方案（按上下文分包 vs 按技术分层）；说明 domain 不依赖框架的理由 |
-| T-037 | 修复 4 个乱码 ADR 文件名，补齐 003/005/006 缺失文件或从 README 摘除 | 评分·文档 20% | SM（Flagg32） | To Do | `campus-overflow-student/docs/adr/README.md` 中 8 条链接全部可点，无 404 |
-| T-038 | 集成测试 `CampusOverflowFlowIT` 处置（D1 决策落地） | 提交物① | SM（Flagg32） | To Do | 按 D1 执行 `@Disabled` 并写明恢复条件；README 记录构建口径 |
+| T-037 | 修复 4 个乱码 ADR 文件名，补齐 003/005/006 缺失文件或从 README 摘除 | 评分·文档 20% | SM（Flagg32） | Done | `campus-overflow-student/docs/adr/README.md` 中 8 条链接全部可点，无 404 |
+| T-038 | 集成测试 `CampusOverflowFlowIT` 处置（D1 决策落地） | 提交物① | SM（Flagg32） | Done | 按 D1 执行 `@Disabled` 并写明恢复条件；README 记录构建口径 |
 | T-039 | 不变式覆盖核查：Lab 3 定稿的 42 条不变式（`feature/lab3-ddd-modeling` 分支，待合并）× 现有 55 个测试 | 评分·不变式 25% | 柯博 | To Do | 产出一张「不变式 → 测试方法」对照表，标出未覆盖项并说明取舍 |
 | T-040 | 《Lab 4 代码走查》文档，支撑全员答辩 | 评分·结构 30% | 江思达 | To Do | 按「请求进入 → 应用服务 → 聚合 → 仓储 → 返回」讲清一条链路，配模块依赖图 |
 
