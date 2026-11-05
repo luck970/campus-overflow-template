@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -30,7 +31,24 @@ import org.testcontainers.utility.DockerImageName;
 /**
  * 端到端集成测试（质量场景 R-2 的验收）：注册 → 登录 → 提问 → 回答 → 采纳 → 声誉结算 → 搜索命中 → 收到通知。
  * 使用真实的 MySQL 8 与 Redis 7（Testcontainers），因此也验证了 Flyway 迁移、ngram 全文索引与发件箱中继。
+ *
+ * <p><b>当前状态：Sprint 2 内禁用（决策 D1，任务 T-038，行动项 A-08）。</b>
+ * 本用例覆盖的链路中，声誉结算、搜索投影、通知投递三项按课程任务清单属于 S3（Sprint 3）范围，
+ * 在 Sprint 2 内无法通过；若保持启用，{@code mvn clean install} 会因集成测试失败而无法全绿，
+ * 从而掩盖单元测试基线的真实状态。因此按「写明理由 + 明确恢复条件」的方式临时 {@code @Disabled}，
+ * 口径见 {@code docs/lab4/提交物与验收口径.md} 第三节与 {@code docs/lab4/lab4-sm-验收核对表.md}。
+ *
+ * <p><b>恢复条件（须同时满足）：</b>
+ * <ol>
+ *   <li>Sprint 3 完成搜索投影、通知投递、声誉结算三项能力；</li>
+ *   <li>删除本类的 {@code @Disabled}，并在本机 Docker（Testcontainers 会拉起 mysql:8.0.39 与 redis:7-alpine）
+ *       下跑通 {@code mvn verify -Dit.test=CampusOverflowFlowIT}；</li>
+ *   <li>构建口径由 {@code mvn clean install -DskipITs} 改回含集成测试的完整构建，并同步更新
+ *       {@code campus-overflow-student/README.md}。</li>
+ * </ol>
+ * 恢复工作的第一责任人是 Sprint 3 的 SM，随 Sprint 3 首个 PR 一并提交。
  */
+@Disabled("Sprint 2 内不可通过：链路含 S3 范围的声誉结算/搜索投影/通知投递；Sprint 3 完成后删除本注解并转绿（D1 / T-038 / A-08）")
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
