@@ -1,0 +1,32 @@
+# 合并门禁：只验证后端全量模块能否从零构建通过（对应 arc42 第 10 章适应度函数）
+# 构建口径与团队约定一致：mvn clean install -DskipITs（跳过集成测试，D1 处置见 T-038 / ADR）
+name: Backend Build Gate
+
+on:
+  push:
+    branches: [main, develop, "sprint/**"]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  backend-build:
+    name: 后端构建（mvn clean install -DskipITs）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: campus-overflow-student/backend
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: temurin
+          cache: maven
+          cache-dependency-path: campus-overflow-student/backend/pom.xml
+
+      # 27 模块 / 14 测试类 / 55 用例基线；基线只增不减
+      - name: 构建
+        run: mvn -q clean install -DskipITs
