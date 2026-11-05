@@ -4,6 +4,10 @@
 > 产出方式：事件风暴 Step 3「Software Design 与聚合识别」——按**命令-事件聚类**识别聚合，再以不变式校验边界。
 > 聚合的定义：**强一致的事务边界**。聚合内强一致（单事务），跨聚合一律最终一致。
 > 本清单与 `backend/` 实际代码逐条对应，可作为 Lab 4 编码与单元测试的验收依据。
+>
+> **分工与主责（Lab 3 成员分工表）**：问答域 **A4 Question / A5 Answer / A6 Vote / A7 Comment** 四个聚合由
+> **江思达（houhai6）主笔**，负责命令/角色卡片与四个聚合的根实体、不变式编号；本文件由其校对并留一次校对提交。
+> 验收标准：每个聚合有根实体与不变式编号，且不变式能在 `QuestionTest` 等测试类中找到对应用例（见第五节精确映射）。
 
 ---
 
@@ -284,18 +288,53 @@
 
 ---
 
-## 五、与代码、测试的对应关系（Lab 4 验收基线）
+## 五、问答域不变式 → 测试方法精确映射（江思达主责，Lab 3 验收基线）
 
-| 聚合 | 领域类 | 现有测试 | 需重点补齐的测试点 |
-| --- | --- | --- | --- |
-| Question | `Question` | `QuestionTest` | I4-3 重复采纳、I4-7 软删除后禁答、I4-8 有回答不可删 |
-| Answer | `Answer` | `VoteAndCommentTest` | I5-3 认证唯一、I5-4 采纳事实来源 |
-| Vote | `Vote` | `VoteAndCommentTest` | I6-2 自投拒绝、I6-3 一人一票、I6-4 改投增量 |
-| Comment | `Comment` | `VoteAndCommentTest` | I7-2 仅一层回复 |
-| ReputationAccount | `ReputationAccount` | `BountyAndAccountTest` | I9-1 账本对账、I9-3 冻结上限 |
-| Bounty | `Bounty` | `BountyAndAccountTest` | I11-3 自赏拒绝、I11-4 重复结算 |
-| Badge | `BadgePolicy` | `BountyAndAccountTest` | 6 类徽章阈值边界 |
-| Course / User | `Course` / `User` | `CourseTest` / `UserTest` | 已完成（Identity 为参考实现） |
+> 验收要求「不变式能在 QuestionTest 找到对应用例」。下表把问答域四个聚合（A4–A7）的每条不变式
+> 逐条对到真实测试类与方法；测试均位于 `co-qa-domain/src/test`，可直接运行核对。
+
+### A4 Question → `QuestionTest`（11 个用例，3 个嵌套分组）
+
+| 不变式 | 测试方法（`QuestionTest`） | 断言要点 |
+| --- | --- | --- |
+| I4-1 标题/正文合法 | `Posting.titleMustBeBetween10And150Chars` | 短标题抛 `BusinessRuleException` |
+| I4-2 标签 1–5 个 | `Posting.requiresOneToFiveTags` | 空标签与 6 个标签均被拒 |
+| I4-2 标签去重/规范化 | `Posting.tagsAreNormalizedAndDeduplicated` | `#Java/java/ Spring-Boot ` → `java, spring-boot` |
+| I4-2 标签字符合法 | `Posting.rejectsIllegalTagCharacters` | `<script>` 被拒，`C++` 合法 |
+| I4-3 最多采纳一个 | `Accepting.askerCanAcceptAnAnswerOnce` | 第二次采纳抛 `ConflictException` |
+| I4-4 回答须属本问题 | `Accepting.answerMustBelongToQuestion` | 外来回答抛 `BusinessRuleException` |
+| I4-4 已删除回答不可采纳 | `Accepting.deletedAnswerCannotBeAccepted` | 软删后采纳被拒 |
+| I4-5 仅提问者/管理者可采纳 | `Accepting.otherStudentsCannotAccept` / `courseTeacherCanAcceptOnBehalfOfAsker` | 路人抛 `ForbiddenException`，教师可代采纳 |
+| I4-6 仅作者/管理者可编辑 | `EditingAndDeleting.onlyAuthorOrManagerCanEdit` | 路人被拒，教师可改 |
+| I4-7 软删后禁答/禁采纳 | `EditingAndDeleting.deletedQuestionCannotBeAnswered` | 删除后 `Answer.submit` 被拒 |
+| I4-8 有回答不可删/管理者可删 | `EditingAndDeleting.askerCannotDeleteAnsweredQuestionButManagerCan` | 提问者被拒，教师可删 |
+
+### A5 Answer → `AnswerTest`（3 个）+ `QuestionTest`
+
+| 不变式 | 测试方法 | 断言要点 |
+| --- | --- | --- |
+| I5-1 问题须开放 | `QuestionTest.EditingAndDeleting.deletedQuestionCannotBeAnswered` | 对已删除问题提交回答被拒 |
+| I5-2 仅作者/管理者可编辑删除 | `AnswerTest.strangersCannotEditOrDelete` | 路人编辑/删除均抛 `ForbiddenException` |
+| I5-3 认证仅一次 | `AnswerTest.onlyCourseManagerCanEndorseAndOnlyOnce` | 学生被拒，教师认证后再认证抛 `ConflictException` |
+| I5-4 采纳事实来源唯一 | `QuestionTest.Accepting.askerCanAcceptAnAnswerOnce` | 只写 `Question.acceptedAnswerId`，Answer 不双写 |
+| 采纳后不可删 | `AnswerTest.acceptedAnswerCannotBeDeletedByItsAuthor` | 作者删除被采纳回答被拒，教师可删 |
+
+### A6 Vote → `VoteAndCommentTest`
+
+| 不变式 | 测试方法 | 断言要点 |
+| --- | --- | --- |
+| I6-1 投票值 ±1 | `voteValueMustBePlusOrMinusOne` | 值 2 被拒；`change(-1)` 增量为 1 |
+| I6-2 不自投 | `cannotVoteOnOwnContent` | 给自己投票抛异常且含「自己」 |
+| I6-4 改投增量 | `voteValueMustBePlusOrMinusOne` | `Vote.change` 返回新旧差值 |
+
+### A7 Comment → `VoteAndCommentTest`
+
+| 不变式 | 测试方法 | 断言要点 |
+| --- | --- | --- |
+| I7-2 最多一层回复 | `repliesAreLimitedToOneLevelOnSameTarget` | 对回复再回复被拒 |
+| I7-3 同目标挂载 | `repliesAreLimitedToOneLevelOnSameTarget` | 挂错目标（QUESTION/ANSWER 不一致）被拒 |
+
+> 其余域（Reputation 对应 `BountyAndAccountTest`、Identity 对应 `CourseTest`/`UserTest`）由相应主责人维护，不在本主责范围内。
 
 ---
 
